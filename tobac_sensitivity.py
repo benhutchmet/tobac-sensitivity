@@ -155,6 +155,29 @@ print(dy)
 dxy,dt=tobac.get_spacings(olr,grid_spacing=4500,time_spacing=3600) #time spacing = 1 hour
 
  
+# Proposed wrapper function for calculating dxy
+# Given the longitude, latitude and olr data, calculate the spatial and temporal resolution of the input data.
+def calculate_dxy(longitude, latitude, olr):
+    """
+    Calculates the spatial and temporal resolution of the input data.
+    
+    Parameters:
+    longitude (numpy.ndarray): The longitudes of the input data.
+    latitude (numpy.ndarray): The latitudes of the input data.
+    olr (iris.cube.Cube): The input data.
+    
+    Returns:
+    float: The spatial resolution of the input data.
+    float: The temporal resolution of the input data.
+    """
+    R = 6.3781e6
+    dx = np.gradient(longitude)[1]
+    dx = dx * (pi / 180) * R * np.cos(latitude * pi / 180)
+    dy = np.gradient(latitude)[0]
+    dy = dy * (pi / 180) * R
+    dxy, dt = tobac.get_spacings(olr, grid_spacing=4500, time_spacing=3600)
+    
+    return dxy, dt
 
  
 
@@ -376,7 +399,46 @@ Track["longitude"]=Track["longitude"]-360
 
 Track.to_hdf(savedir / 'Track.h5','table')
 
- 
+
+# Proposed function for performing linking
+# and saving results to file:
+def linking_trackpy_wrapper(Features, tb, dt, dxy, v_max, stubs, order, extrapolate, memory, adaptive_stop, adaptive_step, subnetwork_size, method_linking):
+    """
+    A wrapper function for tobac.linking_trackpy that performs linking and returns a pandas DataFrame with the resulting tracks.
+    
+    Parameters:
+    Features (pandas DataFrame): A DataFrame containing the features to be linked.
+    tb (float): The time interval between frames.
+    dt (float): The maximum distance between features in consecutive frames.
+    dxy (float): The maximum distance between features in the same frame.
+    v_max (float): The maximum velocity of a feature.
+    stubs (int): The number of consecutive frames a feature must be present in to be considered a track.
+    order (int): The order of the polynomial used for fitting the feature positions.
+    extrapolate (bool): Whether to extrapolate the feature positions.
+    memory (int): The number of frames to remember when linking.
+    adaptive_stop (float): The adaptive stopping criterion for linking.
+    adaptive_step (float): The adaptive step size for linking.
+    subnetwork_size (int): The size of the subnetwork used for linking.
+    method_linking (str): The method used for linking.
+    
+    Returns:
+    pandas DataFrame: A DataFrame containing the resulting tracks. - Is this correct harri?
+    """
+    parameters_linking = {
+        'v_max': v_max,
+        'stubs': stubs,
+        'order': order,
+        'extrapolate': extrapolate,
+        'memory': memory,
+        'adaptive_stop': adaptive_stop,
+        'adaptive_step': adaptive_step,
+        'subnetwork_size': subnetwork_size,
+        'method_linking': method_linking
+    }
+    
+    Track = tobac.linking_trackpy(Features, tb, dt=dt, dxy=dxy, **parameters_linking)
+    Track["longitude"] = Track["longitude"] - 360
+    return Track
 
  
 
@@ -487,9 +549,8 @@ print("{}".format(velocity['v'].mean())+" m/s (mean velocity)")
  
 
 #max velocity of MCSs:
-
 print("{}".format(velocity['v'].max())+" m/s (max velocity)")
 
- 
 
 #min velocity of MCSs:
+print("{}".format(velocity['v'].min())+" m/s (min velocity)")
